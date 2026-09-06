@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>看板</title>
+<style>
+:root{--ink:#1f2328;--ink2:#3d444d;--muted:#6b7280;--line:#e2e8f0;--paper:#fff;--ground:#f8fafc;--key:#1e40af;--key-soft:#eef2ff;
+  --warn:#b42318;--warn-soft:#fdecec;--you:#0f766e;--you-soft:#e6f4f1;--math:#5b21b6;--math-soft:#f5f3ff;--aside:#6b7280;--aside-soft:#f3f4f6;
+  --mono:ui-monospace,Menlo,Consolas,monospace;--sans:-apple-system,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.5 var(--sans)}
+.wrap{padding:14px 18px 40px;display:grid;grid-template-columns:repeat(12,1fr);gap:14px;grid-auto-flow:dense}
+section{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+section[hidden]{display:none}
+section>h2{margin:0 0 8px;font-size:14px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:8px}
+section>h2 small{font:12px var(--mono);color:var(--muted);letter-spacing:.04em}
+.c12{grid-column:span 12}.c7{grid-column:span 7}.c5{grid-column:span 5}.c6{grid-column:span 6}
+@media(max-width:1100px){.c7,.c5,.c6{grid-column:span 12}}
+.mono{font-family:var(--mono)}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font:12.5px var(--mono);border:1px solid var(--line);background:var(--ground);color:var(--ink2);white-space:nowrap}
+.chip.key{background:var(--key-soft);border-color:var(--key);color:var(--key)}
+.chip.warn{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.chip.you{background:var(--you-soft);border-color:var(--you);color:var(--you)}
+.chip.math{background:var(--math-soft);border-color:var(--math);color:var(--math)}
+.chip.hollow{background:transparent}
+/* header */
+#hdr{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#hdr h1{margin:0;font-size:20px;font-weight:650;flex:1 1 auto;min-width:200px}
+#dot{width:10px;height:10px;border-radius:50%;background:#94a3b8;display:inline-block;margin-right:6px}
+#dot.live{background:var(--you);box-shadow:0 0 0 3px #d1fae5}#dot.dead{background:var(--warn)}#dot.done{background:#94a3b8}
+#status{width:100%;font:14px var(--mono);color:var(--ink2);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#stopchip{font:600 14px var(--sans);padding:3px 12px}
+#banner{width:100%;background:var(--key-soft);border:1px solid var(--key);color:var(--key);border-radius:6px;padding:6px 10px;font-size:14px}
+button{font:13px var(--sans);border:1px solid var(--line);background:var(--paper);color:var(--ink2);border-radius:6px;padding:4px 10px;cursor:pointer}
+button.on{background:var(--key-soft);border-color:var(--key);color:var(--key)}
+/* timeline */
+#tl{max-height:520px;overflow:auto;font-size:13.5px}
+.row{display:flex;gap:8px;align-items:baseline;padding:2px 4px;border-radius:4px;border-left:3px solid transparent}
+.row:hover{background:var(--ground)}
+.row .t{font:12px var(--mono);color:var(--muted);flex:0 0 46px}
+.row .body{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.row.iter{font-weight:600;color:var(--key);margin-top:4px;border-left-color:var(--key)}
+.row.llm .body{font-family:var(--mono);font-size:12.5px;color:var(--ink2)}
+.row.llm{cursor:pointer}.row.llm.sel{background:var(--key-soft)}
+.row.ok{border-left-color:var(--you)}.row.fail{border-left-color:var(--warn)}
+.row.say{color:var(--ink);font-style:italic}.row.warn{color:var(--warn)}.row.error{color:var(--warn);font-weight:600}
+.row.ck{color:var(--muted);font-family:var(--mono);font-size:12px}
+.row.tool{color:var(--ink2);font-family:var(--mono);font-size:12.5px}
+.pill{font:11.5px var(--mono);padding:0 6px;border-radius:4px;background:var(--aside-soft);color:var(--ink2);margin-right:4px}
+/* meter */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--ground);border-radius:6px;padding:8px 10px}
+.tile .num{font:600 20px var(--mono);color:var(--ink)}.tile .lbl{font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+.bar{height:10px;background:var(--aside-soft);border-radius:5px;overflow:hidden;margin-top:6px}
+.bar>i{display:block;height:100%;background:var(--key);border-radius:5px;transition:width .3s}
+.bar>i.warn{background:var(--warn)}
+.tags{margin-top:8px;font:12.5px var(--mono);display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center}
+.tags .tb{height:8px;background:var(--aside-soft);border-radius:4px}.tags .tb>i{display:block;height:100%;background:var(--math);border-radius:4px}
+.foot{font-size:12px;color:var(--muted);margin-top:6px}
+/* verify */
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:11.5px var(--mono);color:var(--muted);letter-spacing:.04em;font-weight:500}
+td.ok{color:var(--you);font-weight:600}td.fail{color:var(--warn);font-weight:600}
+#vf{max-height:360px;overflow:auto}
+.filters{display:flex;gap:6px;margin-bottom:6px}
+/* prompt / artifact */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.vstrip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.vstrip .chip{cursor:pointer}
+.vnote{font-size:13px;color:var(--ink2);margin:0 0 6px}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:520px;font:12.5px/1.45 var(--mono)}
+.diff .side{min-width:0}
+.diff .ln{display:flex;gap:6px;padding:0 6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.diff .ln .n{flex:0 0 32px;color:var(--muted);text-align:right;user-select:none}
+.diff .ln.add{background:var(--you-soft)}.diff .ln.del{background:var(--warn-soft)}.diff .ln.blank{background:var(--aside-soft)}
+.diff .side+.side{border-left:1px solid var(--line)}
+.single{white-space:pre-wrap;font:12.5px/1.45 var(--mono);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:520px;overflow:auto}
+.dsum{font:12px var(--mono);color:var(--muted);margin:4px 0}
+/* calls */
+#calls{display:grid;grid-template-columns:260px 1fr;gap:10px}
+#clist{max-height:520px;overflow:auto;font:12.5px var(--mono)}
+#clist .ci{padding:3px 6px;border-radius:4px;cursor:pointer;display:flex;gap:6px;justify-content:space-between}
+#clist .ci:hover{background:var(--ground)}#clist .ci.sel{background:var(--key-soft)}
+#cdetail{max-height:520px;overflow:auto;font-size:13px}
+.blk{border-left:3px solid var(--line);padding:4px 8px;margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 var(--mono)}
+.blk.system{border-color:#94a3b8;background:#f8fafc}.blk.user{border-color:var(--key);background:var(--key-soft)}
+.blk.assistant{border-color:var(--you);background:var(--you-soft)}.blk.tool_use{border-color:#0ea5e9;background:#f0f9ff}.blk.tool_result{border-color:#22c55e;background:#f0fdf4}
+.blk .role{font:11px var(--sans);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:2px}
+/* graph */
+#gsvg{width:100%;height:auto;display:block}
+.node rect{fill:#fff;stroke:var(--ink2);stroke-width:1.2}
+.node text{font:12.5px var(--mono);fill:var(--ink)}
+.node.exec rect{fill:var(--key-soft);stroke:var(--key)}
+.node.active rect{fill:var(--key);stroke:var(--key);animation:pulse 1s infinite}
+.node.active text{fill:#fff}
+.node.intr rect{stroke:var(--warn);stroke-dasharray:4 3}
+.node.anchor rect{stroke:var(--math);stroke-width:2.5}
+.edge{fill:none;stroke:var(--aside);stroke-width:1}
+.edge.taken{stroke:var(--key);stroke-width:2.5}
+.elabel{font:11px var(--mono);fill:var(--ink2)}
+@keyframes pulse{50%{opacity:.6}}
+.path{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;font:12px var(--mono)}
+/* score */
+.charts{display:grid;gap:10px}
+.chart svg{width:100%;height:auto;display:block}
+.chart .title{font:12.5px var(--mono);color:var(--ink2);margin-bottom:2px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font:12px var(--mono);color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.circles{width:280px;height:280px;border:1px solid var(--line);border-radius:6px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section class="c12" data-panel="header">
+  <div id="hdr">
+    <span><span id="dot"></span><span id="conn" class="mono" style="font-size:12px;color:var(--muted)">连接中</span></span>
+    <h1 id="title">等待 run.start…</h1>
+    <span id="chips"></span>
+    <button id="followBtn" class="on" onclick="toggleFollow()">跟随</button>
+    <button onclick="fetch('/api/done',{method:'POST'}).then(()=>setStatus('已请求结束'))">结束本次运行</button>
+    <div id="status"></div>
+    <div id="banner" hidden></div>
+  </div>
+</section>
+
+<section class="c7" data-panel="timeline"><h2>循环时间线 <small>timeline</small></h2><div id="tl"></div></section>
+
+<section class="c5" data-panel="meter"><h2>Token 与成本 <small>tokens · cost</small></h2>
+  <div class="tiles" id="tiles"></div>
+  <div id="budget"></div>
+  <div class="tags" id="tags"></div>
+  <div id="costcurve"></div>
+  <div class="foot" id="pricefoot"></div>
+</section>
+
+<section class="c12" data-panel="prompt" hidden><h2>Prompt / 产物 <small>versions · diff</small></h2>
+  <div class="tabs" id="ptabs"></div><div class="vstrip" id="vstrip"></div><p class="vnote" id="vnote"></p><div id="pbody"></div>
+</section>
+
+<section class="c7" data-panel="calls" hidden><h2>LLM 调用 <small>assembled context</small></h2>
+  <div id="ctxcurve"></div>
+  <div id="calls"><div id="clist"></div><div id="cdetail"><span style="color:var(--muted)">点一条调用，看它发出去的完整上下文</span></div></div>
+</section>
+
+<section class="c5" data-panel="verify" hidden><h2>验证 / 尺子 <small>verify</small></h2>
+  <div class="filters"><button class="on" data-f="all" onclick="setFilter('all')">全部</button><button data-f="fail" onclick="setFilter('fail')">只看失败</button><button data-f="pub" onclick="setFilter('pub')">公开</button><button data-f="priv" onclick="setFilter('priv')">私有</button><span id="vsum" class="mono" style="font-size:12px;color:var(--muted);margin-left:auto"></span></div>
+  <div id="vf"></div>
+</section>
+
+<section class="c7" data-panel="graph" hidden><h2>图 <small>graph</small></h2><div class="tabs" id="gtabs"></div><div id="gbox"></div><div class="path" id="gpath"></div></section>
+
+<section class="c5" data-panel="score" hidden><h2>分数曲线 <small>score</small></h2><div class="charts" id="charts"></div></section>
+</div>
+
+<script>
+// ────────────────────────────────────────────── 状态与 reducer
+const S = {run:null, stop:null, loops:new Map(), loopOrder:[], rows:[], calls:new Map(), callOrder:[], verifies:[],
+  versions:new Map(), vsel:{name:null, v:null, base:'prev'}, graphs:new Map(), gsel:null, series:new Map(), cum:{calls:0,in:0,out:0,cost:0,sec:0}, byTag:{}, budget:{}, prices:{},
+  follow:true, filter:'all', csel:null, connected:false, lastSeq:0};
+const dirty = new Set();
+const KIND2PANEL = {'prompt.version':'prompt','artifact':'prompt','llm.call':'calls','verify':'verify','graph.def':'graph','score':'score'};
+
+function reduce(ev){
+  S.lastSeq = ev.seq;
+  const p = KIND2PANEL[ev.kind]; if(p){ const el=document.querySelector(`[data-panel=${p}]`); if(el.hidden){ el.hidden=false; } dirty.add(p); }
+  switch(ev.kind){
+    case 'run.start':
+      if(S.run && S.run.run_id!==ev.run_id){ resetForNewRun(); showBanner(`已重连到新进程 ${ev.run_id}${ev.resumed?'（续跑）':''}`); }
+      S.run=ev; S.budget=ev.budget||{}; S.prices=ev.prices||{}; S.stop=null; dirty.add('header'); dirty.add('meter'); break;
+    case 'loop.iter':{
+      if(!S.loops.has(ev.loop)) S.loopOrder.push(ev.loop);
+      S.loops.set(ev.loop,ev);
+      // 更内层的循环名之后再出现外层名 → 内层清掉
+      const idx=S.loopOrder.indexOf(ev.loop);
+      for(const name of S.loopOrder.slice(idx+1)) S.loops.delete(name);
+      pushRow({cls:'iter', depth:idx, t:ev.t, html:`<span class="pill">${esc(ev.loop)}</span>${ev.i}${ev.n?'/'+ev.n:''} ${esc(ev.label||'')}${ev.task?' <span class="pill">'+esc(ev.task)+'</span>':''}`});
+      dirty.add('header'); break; }
+    case 'llm.call': S.calls.set(ev.id,{call:ev,done:null}); S.callOrder.push(ev.id); dirty.add('calls'); break;
+    case 'llm.done':{
+      const c=S.calls.get(ev.id)||{call:null}; c.done=ev; S.calls.set(ev.id,c);
+      if(ev.cum){ S.cum=ev.cum; } S.byTag[ev.tag]=ev.tag_cum||S.byTag[ev.tag];
+      const err=ev.stop_reason==='error';
+      pushRow({cls:'llm'+(err?' fail':''), t:ev.t, id:ev.id, html:`<span class="pill">${esc(ev.tag)}</span>${ev.in}→${ev.out} tok · ${ev.sec}s · $${(ev.cost||0).toFixed(4)}${err?' · <b>失败</b> '+esc(ev.text||''):' · '+esc(firstLine(ev.text))}`});
+      dirty.add('meter'); dirty.add('calls'); break; }
+    case 'tool.call': pushRow({cls:'tool', t:ev.t, html:`🔧 ${esc(ev.name)}(${esc(short(JSON.stringify(ev.input||{}),100))})`}); break;
+    case 'tool.result': pushRow({cls:'tool'+(ev.ok===false?' fail':''), t:ev.t, html:`　↳ ${esc(short(ev.output||'',140))}`}); break;
+    case 'verify': S.verifies.push(ev); pushRow({cls:ev.ok?'ok':'fail', t:ev.t, html:`${ev.ok?'✓':'✗'} <span class="pill">${esc(ev.check||'')}${ev.private?' 🔒':''}</span>${esc(ev.target)}${ev.score!=null?' '+ev.score+(ev.max!=null?'/'+ev.max:''):''} — ${esc(ev.feedback||'')}`}); dirty.add('verify'); break;
+    case 'prompt.version': case 'artifact':{
+      const key=ev.name; if(!S.versions.has(key)) S.versions.set(key,[]);
+      S.versions.get(key).push(ev);
+      if(!S.vsel.name || S.follow){ S.vsel.name=key; S.vsel.v=ev.v; }
+      pushRow({cls:'ck', t:ev.t, html:`📄 ${esc(key)} v${ev.v}${ev.accepted===true?' <span class="chip you">accept</span>':ev.accepted===false?' <span class="chip warn hollow">reject</span>':''} ${esc(ev.note||'')}`});
+      dirty.add('prompt'); break; }
+    case 'checkpoint': pushRow({cls:'ck', t:ev.t, html:`💾 ${esc(ev.path.split('/').slice(-2).join('/'))} ${esc(ev.status||'')}${ev.next?' → '+esc(ev.next):''}`}); break;
+    case 'graph.def':{
+      const name=ev.graph||'graph'; let g=S.graphs.get(name);
+      if(!g||ev.mode!=='merge'){ g={def:ev, exec:new Set(ev.path||[]), active:null, taken:new Set(), path:[...(ev.path||[])]}; }
+      else { const ids=new Set(g.def.nodes.map(n=>n.id)); for(const n of ev.nodes){ const old=g.def.nodes.find(x=>x.id===n.id); if(old) Object.assign(old,n); else g.def.nodes.push(n);} for(const e of ev.edges){ if(!g.def.edges.some(x=>x.from===e.from&&x.to===e.to)) g.def.edges.push(e);} }
+      S.graphs.set(name,g); if(!S.gsel||S.follow) S.gsel=name; dirty.add('graph'); break; }
+    case 'graph.node':{
+      const g=S.graphs.get(ev.graph||'graph'); if(!g) break;
+      const ids=ev.parallel_group||[ev.node];
+      if(ev.phase==='start'){ g.active=ids; }
+      else if(ev.phase==='end'){ ids.forEach(i=>g.exec.add(i)); g.active=null; g.path.push(ev.node); }
+      else if(ev.phase==='interrupt'){ g.active=null; g.interrupted=ev.node; }
+      dirty.add('graph'); break; }
+    case 'graph.edge':{ const g=S.graphs.get(ev.graph||'graph'); if(g){ g.taken.add(ev.from+'→'+ev.to); dirty.add('graph'); } break; }
+    case 'score':{ const grp=ev.group||'score'; if(!S.series.has(grp)) S.series.set(grp,new Map()); const m=S.series.get(grp); if(!m.has(ev.series)) m.set(ev.series,[]); m.get(ev.series).push([ev.x,ev.y,ev.label]); dirty.add('score'); break; }
+    case 'stop': S.stop=ev; if(ev.bill) S.cum={calls:ev.bill.calls,in:ev.bill.in,out:ev.bill.out,cost:ev.bill.cost,sec:ev.bill.sec}; S.byTag=ev.by_tag||S.byTag; pushRow({cls:ev.ok===false?'error':'iter', t:ev.t, html:`⏹ 停机：${esc(ev.reason)} ${esc(JSON.stringify(ev.summary||{}))}`}); dirty.add('header'); dirty.add('meter'); break;
+    case 'log':{ const lv=ev.level||'info'; if(lv==='status'){ S.statusText=ev.text; dirty.add('header'); break; } pushRow({cls:lv==='say'?'say':lv==='warn'?'warn':lv==='error'?'error':'', t:ev.t, html:esc(ev.text)}); break; }
+  }
+}
+function resetForNewRun(){ S.loops.clear(); S.loopOrder=[]; S.rows=[]; S.calls.clear(); S.callOrder=[]; S.verifies=[]; S.versions.clear(); S.vsel={name:null,v:null,base:'prev'}; S.graphs.clear(); S.gsel=null; S.series.clear(); S.cum={calls:0,in:0,out:0,cost:0,sec:0}; S.byTag={}; S.stop=null; S.statusText=''; ['timeline','calls','verify','prompt','graph','score','meter'].forEach(p=>dirty.add(p)); }
+function pushRow(r){ const depth=(r.depth!=null?r.depth:Math.max(0,curDepth())); S.rows.push({...r,depth:r.depth!=null?r.depth:depth+1}); dirty.add('timeline'); }
+function curDepth(){ let d=-1; S.loopOrder.forEach((n,i)=>{ if(S.loops.has(n)) d=i; }); return d; }
+
+// ────────────────────────────────────────────── 渲染
+let raf=null;
+function schedule(){ if(raf) return; raf=requestAnimationFrame(()=>{ raf=null; const ds=[...dirty]; dirty.clear(); ds.forEach(p=>RENDER[p]&&RENDER[p]()); }); }
+const RENDER = {
+  header(){
+    const r=S.run; if(r){ document.getElementById('title').textContent=r.title; document.title=r.title;
+      document.getElementById('chips').innerHTML=`<span class="chip">${esc(r.model)}</span>${r.checker_model?` <span class="chip you">checker ${esc(r.checker_model)}</span>`:''} <span class="chip hollow">${esc(r.run_id)}</span>${r.fast?' <span class="chip warn hollow">--fast</span>':''}`; }
+    const st=document.getElementById('status'); const parts=[];
+    for(const n of S.loopOrder){ const ev=S.loops.get(n); if(ev) parts.push(`${n} ${ev.i}${ev.n?'/'+ev.n:''}${ev.label?' · '+esc(ev.label):''}`); }
+    let html=`现在：${parts.join(' &nbsp;›&nbsp; ')||'—'}${S.statusText?' &nbsp;·&nbsp; '+esc(S.statusText):''}`;
+    if(S.stop){ const cls=S.stop.ok===true?'you':(/interrupt/.test(S.stop.reason)?'key':'warn'); html+=` <span id="stopchip" class="chip ${cls}">⏹ ${esc(S.stop.reason)}</span>`; }
+    st.innerHTML=html;
+  },
+  timeline(){
+    const tl=document.getElementById('tl'); const frag=[];
+    for(const r of S.rows){ frag.push(`<div class="row ${r.cls}" style="margin-left:${Math.min(r.depth,6)*14}px"${r.id?` data-id="${r.id}" onclick="selectCall('${r.id}')"`:''}><span class="t">${mmss(r.t)}</span><span class="body">${r.html}</span></div>`); }
+    tl.innerHTML=frag.join(''); if(S.follow) tl.scrollTop=tl.scrollHeight;
+  },
+  meter(){
+    const c=S.cum; const cache=[...S.calls.values()].reduce((a,x)=>a+((x.done&&x.done.cache_read)||0),0);
+    document.getElementById('tiles').innerHTML=[['调用次数',c.calls],['输入 tokens',fmtK(c.in)],['输出 tokens',fmtK(c.out)],['缓存读',fmtK(cache)],['成本估算','$'+(c.cost||0).toFixed(3)],['模型耗时',(c.sec||0).toFixed(0)+'s']].map(([l,v])=>`<div class="tile"><div class="num">${v}</div><div class="lbl">${l}</div></div>`).join('');
+    const b=S.budget||{}; let bh='';
+    if(b.usd){ const f=Math.min(1,(c.cost||0)/b.usd); bh+=`<div class="foot">预算 $${b.usd}：${(f*100).toFixed(0)}%</div><div class="bar"><i class="${f>0.8?'warn':''}" style="width:${f*100}%"></i></div>`; }
+    if(b.tokens){ const f=Math.min(1,((c.in||0)+(c.out||0))/b.tokens); bh+=`<div class="foot">token 预算 ${fmtK(b.tokens)}：${(f*100).toFixed(0)}%</div><div class="bar"><i class="${f>0.8?'warn':''}" style="width:${f*100}%"></i></div>`; }
+    document.getElementById('budget').innerHTML=bh;
+    const tags=Object.entries(S.byTag||{}); const mx=Math.max(1,...tags.map(([,t])=>t.cost||0));
+    document.getElementById('tags').innerHTML=tags.map(([k,t])=>`<span>${esc(k)}</span><div class="tb"><i style="width:${(t.cost||0)/mx*100}%"></i></div><span>${t.calls} 次 · $${(t.cost||0).toFixed(3)}</span>`).join('');
+    // 累计成本曲线
+    let acc=0; const pts=S.callOrder.map(id=>S.calls.get(id).done).filter(Boolean).map(d=>[++acc, d.cum?d.cum.cost:0]);
+    document.getElementById('costcurve').innerHTML=pts.length>1?`<div class="foot">累计成本（按调用序）</div>`+sparkline(pts,'#1e40af',60):'';
+    const m=S.run&&S.run.model; const pr=m&&Object.entries(S.prices||{}).find(([k])=>m.startsWith(k));
+    document.getElementById('pricefoot').textContent=pr?`价格 ${m}：$${pr[1][0]} / $${pr[1][1]} 每百万 token（输入/输出）`:'';
+  },
+  verify(){
+    const f=S.filter; const rows=S.verifies.filter(v=>f==='all'||(f==='fail'&&!v.ok)||(f==='pub'&&!v.private)||(f==='priv'&&v.private));
+    document.getElementById('vf').innerHTML=`<table><tr><th>目标</th><th>类型</th><th></th><th>分</th><th>反馈</th></tr>${rows.map(v=>`<tr><td class="mono">${esc(v.target)}</td><td class="mono">${esc(v.check||'')}${v.private?' 🔒':''}</td><td class="${v.ok?'ok':'fail'}">${v.ok?'✓':'✗'}</td><td class="mono">${v.score!=null?v.score+(v.max!=null?'/'+v.max:''):''}</td><td>${esc(v.feedback||'')}</td></tr>`).join('')}</table>`;
+    const pub=S.verifies.filter(v=>!v.private), priv=S.verifies.filter(v=>v.private);
+    document.getElementById('vsum').textContent=`通过 ${S.verifies.filter(v=>v.ok).length}/${S.verifies.length}`+(priv.length?` · 私有 ${priv.filter(v=>v.ok).length}/${priv.length}`:'');
+  },
+  prompt(){
+    const names=[...S.versions.keys()]; if(!S.vsel.name) S.vsel.name=names[0];
+    document.getElementById('ptabs').innerHTML=names.map(n=>`<button class="${n===S.vsel.name?'on':''}" onclick="selVersion('${escq(n)}',null)">${esc(n)} <small>×${S.versions.get(n).length}</small></button>`).join('');
+    const vs=S.versions.get(S.vsel.name)||[]; if(!vs.length) return;
+    if(S.vsel.v==null||!vs.find(x=>x.v===S.vsel.v)) S.vsel.v=vs[vs.length-1].v;
+    const cur=vs.find(x=>x.v===S.vsel.v);
+    document.getElementById('vstrip').innerHTML=vs.map(x=>`<span class="chip ${x.accepted===true?'key':x.accepted===false?'warn hollow':''} ${x.v===S.vsel.v?'':'hollow'}" style="${x.v===S.vsel.v?'outline:2px solid var(--key)':''}" onclick="selVersion('${escq(S.vsel.name)}',${x.v})">v${x.v}${x.score?' '+esc(scoreStr(x.score)):''}</span>`).join('')+
+      ` <span style="margin-left:auto"></span><button class="${S.vsel.base==='prev'?'on':''}" onclick="S.vsel.base='prev';dirty.add('prompt');schedule()">对比上一版</button><button class="${S.vsel.base==='acc'?'on':''}" onclick="S.vsel.base='acc';dirty.add('prompt');schedule()">对比上一接受版</button>`;
+    document.getElementById('vnote').innerHTML=(cur.note?esc(cur.note):'')+(cur.accepted===true?' <span class="chip you">accepted</span>':cur.accepted===false?' <span class="chip warn hollow">rejected</span>':'');
+    const idx=vs.indexOf(cur); let base=null;
+    if(S.vsel.base==='prev') base=idx>0?vs[idx-1]:null; else { for(let i=idx-1;i>=0;i--){ if(vs[i].accepted===true){ base=vs[i]; break; } } }
+    const fmt=t=>cur.lang==='json'?prettyJson(t):t;
+    let html='';
+    if(!base){ html=`<div class="single">${esc(fmt(cur.text||''))}</div>`; }
+    else{ html=renderDiff(fmt(base.text||'').split('\n'), fmt(cur.text||'').split('\n'), `v${base.v}`, `v${cur.v}`); }
+    if(cur.render==='circles'){ html+=renderCircles(cur.text); }
+    document.getElementById('pbody').innerHTML=html;
+  },
+  calls(){
+    const list=document.getElementById('clist');
+    list.innerHTML=S.callOrder.map(id=>{ const c=S.calls.get(id); const d=c.done; return `<div class="ci ${id===S.csel?'sel':''}" onclick="selectCall('${id}')"><span>${esc(id)}</span><span>${d?`${d.in}→${d.out} · ${d.sec}s`:'…'}</span></div>`; }).join('');
+    if(S.follow&&!S.cselPinned) S.csel=S.callOrder[S.callOrder.length-1];
+    const pts=S.callOrder.map((id,i)=>[i+1,(S.calls.get(id).done||{}).in||0]);
+    document.getElementById('ctxcurve').innerHTML=pts.length>1?`<div class="foot">每次调用发出去的上下文（输入 tokens）</div>`+sparkline(pts,'#5b21b6',50):'';
+    renderCallDetail();
+  },
+  graph(){
+    const names=[...S.graphs.keys()]; if(!S.gsel||!S.graphs.has(S.gsel)) S.gsel=names[names.length-1];
+    document.getElementById('gtabs').innerHTML=names.length>1?names.map(n=>`<button class="${n===S.gsel?'on':''}" onclick="S.gsel='${escq(n)}';S.follow=false;dirty.add('graph');schedule()">${esc(n)}</button>`).join(''):'';
+    const g=S.graphs.get(S.gsel); if(!g) return;
+    document.getElementById('gbox').innerHTML=renderGraph(g);
+    document.getElementById('gpath').innerHTML=g.path.map((n,i)=>`<span class="chip ${i===g.path.length-1?'key':''}">${esc(n)}</span>`).join('<span>→</span>');
+  },
+  score(){
+    const box=document.getElementById('charts'); const out=[];
+    for(const [grp,m] of S.series){ out.push(renderChart(grp,m)); }
+    box.innerHTML=out.join('');
+  },
+};
+
+// ────────────────────────────────────────────── 交互
+function toggleFollow(){ S.follow=!S.follow; document.getElementById('followBtn').classList.toggle('on',S.follow); if(S.follow){ S.cselPinned=false; dirty.add('timeline'); schedule(); } }
+function setFilter(f){ S.filter=f; document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('on',b.dataset.f===f)); dirty.add('verify'); schedule(); }
+function selVersion(name,v){ S.vsel.name=name; S.vsel.v=v; S.follow=false; document.getElementById('followBtn').classList.remove('on'); dirty.add('prompt'); schedule(); }
+function selectCall(id){ S.csel=id; S.cselPinned=true; dirty.add('calls'); dirty.add('timeline'); document.querySelectorAll('.row.llm').forEach(r=>r.classList.toggle('sel',r.dataset.id===id)); schedule(); }
+function setStatus(t){ S.statusText=t; dirty.add('header'); schedule(); }
+function showBanner(t){ const b=document.getElementById('banner'); b.textContent=t; b.hidden=false; }
+function renderCallDetail(){
+  const c=S.csel&&S.calls.get(S.csel); const box=document.getElementById('cdetail'); if(!c||!c.call){ return; }
+  const ev=c.call, d=c.done; let h=`<div class="foot mono">${esc(ev.id)} · ${esc(ev.model)} · system ${ev.sys_chars} 字 · messages ${ev.msg_chars} 字 · 估 ${ev.est_in} tok${d?` · 实 ${d.in}→${d.out} · ${d.sec}s · $${(d.cost||0).toFixed(4)} · ${esc(d.stop_reason||'')}`:''}${ev.tools&&ev.tools.length?' · tools: '+esc(ev.tools.join(',')):''}</div>`;
+  h+=`<div class="blk system"><span class="role">system</span>${esc(ev.system||'')}</div>`;
+  for(const m of ev.messages||[]){
+    if(typeof m.content==='string'){ h+=`<div class="blk ${m.role}"><span class="role">${m.role}</span>${esc(m.content)}</div>`; continue; }
+    for(const b of m.content||[]){
+      if(b.type==='text') h+=`<div class="blk ${m.role}"><span class="role">${m.role}</span>${esc(b.text||'')}</div>`;
+      else if(b.type==='tool_use') h+=`<div class="blk tool_use"><span class="role">tool_use · ${esc(b.name)}</span>${esc(JSON.stringify(b.input||{},null,1))}</div>`;
+      else if(b.type==='tool_result'){ const t=typeof b.content==='string'?b.content:(b.content||[]).map(x=>x.text||'').join('\n'); h+=`<div class="blk tool_result"><span class="role">tool_result</span>${esc(t)}</div>`; }
+    }
+  }
+  if(d){ h+=`<div class="blk assistant"><span class="role">assistant（回复）</span>${esc(d.text||'')}${(d.tool_uses||[]).map(u=>`\n[tool_use ${esc(u.name)} ${esc(JSON.stringify(u.input||{}))}]`).join('')}</div>`; }
+  box.innerHTML=h;
+}
+
+// ────────────────────────────────────────────── diff（逐行 LCS，并排）
+function lcsDiff(a,b){
+  const n=a.length,m=b.length; if(n*m>4000000) return [...a.map(x=>['-',x,null]),...b.map(x=>['+',null,x])];
+  const W=m+1, dp=new Uint16Array((n+1)*W);
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) dp[i*W+j]=a[i]===b[j]?dp[(i+1)*W+j+1]+1:Math.max(dp[(i+1)*W+j],dp[i*W+j+1]);
+  const ops=[]; let i=0,j=0;
+  while(i<n&&j<m){ if(a[i]===b[j]){ops.push(['=',a[i],b[j]]);i++;j++;} else if(dp[(i+1)*W+j]>=dp[i*W+j+1]){ops.push(['-',a[i],null]);i++;} else {ops.push(['+',null,b[j]]);j++;} }
+  while(i<n) ops.push(['-',a[i++],null]); while(j<m) ops.push(['+',null,b[j++]]);
+  return ops;
+}
+function renderDiff(a,b,la,lb){
+  const ops=lcsDiff(a,b); const L=[],R=[]; let li=0,ri=0, add=0,del=0;
+  let k=0;
+  while(k<ops.length){
+    if(ops[k][0]==='='){ L.push(['',++li,ops[k][1]]); R.push(['',++ri,ops[k][2]]); k++; continue; }
+    const dels=[],adds=[];
+    while(k<ops.length&&ops[k][0]==='-'){ dels.push(ops[k][1]); k++; }
+    while(k<ops.length&&ops[k][0]==='+'){ adds.push(ops[k][2]); k++; }
+    const h=Math.max(dels.length,adds.length);
+    for(let x=0;x<h;x++){ if(x<dels.length){ L.push(['del',++li,dels[x]]); del++; } else L.push(['blank','','']); if(x<adds.length){ R.push(['add',++ri,adds[x]]); add++; } else R.push(['blank','','']); }
+  }
+  const side=(rows,label)=>`<div class="side"><div class="ln" style="color:var(--muted)"><span class="n"></span>${esc(label)}</div>${rows.map(([c,n,t])=>`<div class="ln ${c}"><span class="n">${n}</span>${esc(t)}</div>`).join('')}</div>`;
+  return `<div class="dsum">${la} → ${lb}：+${add} −${del} 行</div><div class="diff">${side(L,la)}${side(R,lb)}</div>`;
+}
+
+// ────────────────────────────────────────────── 图布局（DFS 定回边 → 最长路分层）
+function layoutGraph(def){
+  const ids=def.nodes.map(n=>n.id); const END='END'; const all=[...ids]; if(def.edges.some(e=>e.to===END)&&!all.includes(END)) all.push(END);
+  const out=new Map(all.map(i=>[i,[]])); for(const e of def.edges){ if(out.has(e.from)) out.get(e.from).push(e); }
+  const state=new Map(), order=[], back=new Set();
+  (function dfs(v){ state.set(v,1); order.push(v); for(const e of out.get(v)||[]){ const s=state.get(e.to); if(s===1) back.add(e); else if(!s) dfs(e.to); } state.set(v,2); })(def.entry||all[0]);
+  for(const v of all) if(!state.get(v)){ order.push(v); state.set(v,2); }
+  const layer=new Map(all.map(i=>[i,0]));
+  for(let it=0;it<all.length+1;it++) for(const e of def.edges){ if(back.has(e)) continue; if(layer.has(e.from)&&layer.has(e.to)&&layer.get(e.to)<layer.get(e.from)+1) layer.set(e.to,layer.get(e.from)+1); }
+  const byLayer=new Map(); for(const v of order){ const l=layer.get(v)||0; if(!byLayer.has(l)) byLayer.set(l,[]); byLayer.get(l).push(v); }
+  const W=150,H=38,colW=190,rowH=92; const pos=new Map(); let maxCols=1;
+  for(const [l,vs] of byLayer){ maxCols=Math.max(maxCols,vs.length); vs.forEach((v,i)=>pos.set(v,{x:40+i*colW,y:30+l*rowH,w:W,h:H})); }
+  const width=Math.max(...[...pos.values()].map(p=>p.x+p.w))+60, height=Math.max(...[...pos.values()].map(p=>p.y+p.h))+30;
+  return {pos,back,width,height};
+}
+function renderGraph(g){
+  const def=g.def; const {pos,back,width,height}=layoutGraph(def);
+  const intr=new Set(def.interrupt_before||[]), anchors=new Set(def.anchors||[]);
+  let s=`<svg id="gsvg" viewBox="0 0 ${width} ${height}" style="max-width:100%;width:${Math.round(width*1.15)}px"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6b7280"/></marker><marker id="ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1e40af"/></marker></defs>`;
+  const seenPair={};
+  for(const e of def.edges){
+    const a=pos.get(e.from), b=pos.get(e.to); if(!a||!b) continue;
+    const pk=e.from+'→'+e.to; const dup=(seenPair[pk]=(seenPair[pk]||0)+1)-1;   // 同起终点的第 n 条边，标签错开
+    const taken=g.taken.has(e.from+'→'+e.to); let d;
+    if(back.has(e)){ const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x+b.w, y2=b.y+b.h/2; d=`M${x1} ${y1} C ${x1+60} ${y1}, ${x2+60} ${y2}, ${x2} ${y2}`; }
+    else { const x1=a.x+a.w/2, y1=a.y+a.h, x2=b.x+b.w/2, y2=b.y; d=Math.abs(y2-y1)<1?`M${a.x+a.w} ${a.y+a.h/2} L${b.x} ${b.y+b.h/2}`:`M${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`; }
+    s+=`<path class="edge ${taken?'taken':''}" d="${d}" marker-end="url(#${taken?'ahk':'ah'})"/>`;
+    if(e.label){ const mx=(a.x+a.w/2+b.x+b.w/2)/2, my=(a.y+a.h+b.y)/2; s+=`<text class="elabel" x="${back.has(e)?a.x+a.w+64:mx+4+dup*10}" y="${(back.has(e)?(a.y+b.y+b.h)/2:my)+dup*14}">${esc(e.label)}</text>`; }
+  }
+  for(const [id,p] of pos){
+    const n=def.nodes.find(x=>x.id===id)||{id}; const active=g.active&&g.active.includes(id);
+    const cls=['node', g.exec.has(id)?'exec':'', active?'active':'', intr.has(id)?'intr':'', (anchors.has(id)||['anchor','validator'].includes(n.kind))?'anchor':''].join(' ');
+    const label=(n.label||id); s+=`<g class="${cls}"><rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="6"/><text x="${p.x+p.w/2}" y="${p.y+p.h/2+4}" text-anchor="middle">${esc(label.length>20?label.slice(0,19)+'…':label)}</text></g>`;
+  }
+  return s+'</svg>';
+}
+
+// ────────────────────────────────────────────── 曲线
+const COLORS=['#1e40af','#5b21b6','#0f766e','#b42318','#6b7280','#0ea5e9'];
+function renderChart(grp,m){
+  const series=[...m.entries()]; const allBars=series.every(([,pts])=>pts.length===1);
+  const W=420,H=200,px=42,py=18; let xs=[],ys=[];
+  series.forEach(([,pts])=>pts.forEach(([x,y])=>{xs.push(+x);ys.push(+y);}));
+  const xmin=allBars?0:Math.min(...xs), xmax=allBars?series.length:Math.max(...xs,xmin+1), ymin=Math.min(0,...ys), ymax=Math.max(...ys,ymin+1e-9);
+  const X=x=>px+(x-xmin)/((xmax-xmin)||1)*(W-px-10), Y=y=>H-py-(y-ymin)/((ymax-ymin)||1)*(H-2*py);
+  let s=`<div class="chart"><div class="title">${esc(grp)}</div><svg viewBox="0 0 ${W} ${H}">`;
+  const ticks=5; for(let i=0;i<=ticks;i++){ const y=ymin+(ymax-ymin)*i/ticks; s+=`<line x1="${px}" x2="${W-10}" y1="${Y(y)}" y2="${Y(y)}" stroke="#e2e8f0"/><text x="${px-4}" y="${Y(y)+4}" text-anchor="end" font-size="10" fill="#6b7280" font-family="ui-monospace,Menlo">${fmtNum(y)}</text>`; }
+  if(allBars){ const bw=(W-px-10)/series.length*0.6; series.forEach(([name,pts],i)=>{ const x=X(i+0.5)-bw/2, y=Y(pts[0][1]); s+=`<rect x="${x}" y="${y}" width="${bw}" height="${Y(ymin)-y}" fill="${COLORS[i%6]}" opacity="${pts[0][2]==='hollow'?0.35:0.9}"/><text x="${x+bw/2}" y="${y-4}" text-anchor="middle" font-size="11" font-family="ui-monospace,Menlo" fill="#1f2328">${fmtNum(pts[0][1])}</text><text x="${x+bw/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="#6b7280" font-family="ui-monospace,Menlo">${esc(name)}</text>`; }); }
+  else { const xt=Math.min(10,Math.max(1,Math.round(xmax-xmin))); for(let i=0;i<=xt;i++){ const x=xmin+(xmax-xmin)*i/xt; s+=`<text x="${X(x)}" y="${H-4}" text-anchor="middle" font-size="10" fill="#6b7280" font-family="ui-monospace,Menlo">${fmtNum(x)}</text>`; }
+    series.forEach(([name,pts],i)=>{ const c=COLORS[i%6]; const sorted=[...pts].sort((a,b)=>a[0]-b[0]); s+=`<polyline fill="none" stroke="${c}" stroke-width="2" points="${sorted.map(([x,y])=>X(x)+','+Y(y)).join(' ')}"/>`; sorted.forEach(([x,y,l])=>{ s+=`<circle cx="${X(x)}" cy="${Y(y)}" r="4" fill="${l==='reject'?'#fff':c}" stroke="${c}" stroke-width="2"/>`; }); }); }
+  s+=`</svg><div class="legend">${series.map(([n],i)=>`<span><i style="background:${COLORS[i%6]}"></i>${esc(n)}</span>`).join('')}</div></div>`;
+  return s;
+}
+function sparkline(pts,color,h){ const W=380; const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]); const xmin=Math.min(...xs),xmax=Math.max(...xs),ymax=Math.max(...ys,1e-9); const X=x=>4+(x-xmin)/((xmax-xmin)||1)*(W-8), Y=y=>h-4-(y/ymax)*(h-8); return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:auto;display:block"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${pts.map(([x,y])=>X(x)+','+Y(y)).join(' ')}"/><text x="${W-4}" y="12" text-anchor="end" font-size="10" fill="#6b7280" font-family="ui-monospace,Menlo">${fmtNum(ymax)}</text></svg>`; }
+function renderCircles(text){ let cs; try{ cs=JSON.parse(text); }catch(e){ return ''; } if(!Array.isArray(cs)) cs=cs.circles||[]; const S_=280; return `<svg class="circles" viewBox="0 0 ${S_} ${S_}"><rect x="0" y="0" width="${S_}" height="${S_}" fill="#fff"/>${cs.map((c,i)=>`<circle cx="${c[0]*S_}" cy="${S_-c[1]*S_}" r="${c[2]*S_}" fill="${COLORS[i%6]}" fill-opacity=".35" stroke="${COLORS[i%6]}"/>`).join('')}</svg>`; }
+
+// ────────────────────────────────────────────── 工具
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escq(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function short(s,n){ s=String(s); return s.length>n?s.slice(0,n)+'…':s; }
+function firstLine(s){ return short((s||'').trim().split('\n')[0],90); }
+function mmss(t){ t=Math.max(0,Math.round(t||0)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+function fmtK(n){ n=n||0; return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n); }
+function fmtNum(x){ return Number.isInteger(x)?String(x):(+x).toFixed(Math.abs(x)<1?3:2).replace(/\.?0+$/,''); }
+function scoreStr(sc){ return typeof sc==='object'?Object.entries(sc).map(([k,v])=>`${k}=${v}`).join(' '):String(sc); }
+function prettyJson(t){ try{ return JSON.stringify(JSON.parse(t),null,2); }catch(e){ return t; } }
+
+// ────────────────────────────────────────────── 连接
+let es=null;
+function connect(){
+  es=new EventSource('/events?since=0');
+  es.onopen=()=>{ S.connected=true; document.getElementById('dot').className='live'; document.getElementById('conn').textContent='实时'; };
+  es.onmessage=e=>{ try{ reduce(JSON.parse(e.data)); schedule(); }catch(err){ console.error(err); } };
+  es.onerror=()=>{ S.connected=false; document.getElementById('dot').className=S.stop?'done':'dead'; document.getElementById('conn').textContent=S.stop?'已结束':'连接断开，重连中…'; };
+}
+connect();
+</script>
+</body>
+</html>
